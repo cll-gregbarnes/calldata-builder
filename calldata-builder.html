@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calldata Builder + Safe Tx Builder Export</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#0b0f14; color:#e6edf3; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    .sub { margin: 0 0 18px; color:#9fb0c0; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background:#0f1621; border:1px solid #1c2a3a; border-radius: 12px; padding: 14px; }
+    label { display:block; font-size: 12px; color:#9fb0c0; margin: 10px 0 6px; }
+    input, textarea, select {
+      width: 100%; box-sizing: border-box;
+      background:#0b111a; color:#e6edf3;
+      border:1px solid #233448; border-radius: 10px;
+      padding: 10px 12px; outline: none;
+    }
+    textarea { min-height: 180px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .row { display:flex; gap: 10px; align-items:center; }
+    .row > * { flex: 1; }
+    .btn {
+      cursor:pointer; border:1px solid #2a3d55; background:#142033; color:#e6edf3;
+      padding: 10px 12px; border-radius: 10px; font-weight: 600;
+    }
+    .btn:disabled { opacity: .5; cursor:not-allowed; }
+    .btn.secondary { background:#0b111a; }
+    .muted { color:#9fb0c0; font-size: 12px; }
+    .err { color:#ff8b8b; font-size: 12px; white-space: pre-wrap; }
+    .ok { color:#91ffb5; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; border:1px solid #2a3d55; font-size: 11px; color:#b9c7d6; margin-left: 8px; }
+    .inputs { margin-top: 10px; display:flex; flex-direction:column; gap: 10px; }
+    .inputBlock { border:1px solid #1c2a3a; border-radius: 12px; padding: 10px; background:#0b111a; }
+    .inputHeader { display:flex; align-items:flex-start; justify-content: space-between; gap: 10px; }
+    .inputHeader .left { min-width: 0; }
+    .small { font-size: 11px; color:#9fb0c0; }
+    .hint { font-size: 11px; color:#b9c7d6; margin-top: 6px; }
+    .kvs { display:flex; flex-direction:column; gap: 8px; margin-top: 10px; }
+
+    details { border:1px solid #1c2a3a; border-radius: 12px; padding: 8px 10px; background:#0b111a; }
+    summary { cursor:pointer; list-style:none; display:flex; gap:10px; align-items:center; }
+    summary::-webkit-details-marker { display:none; }
+    .tag { border:1px solid #2a3d55; border-radius:999px; padding: 2px 8px; font-size: 11px; color:#b9c7d6; }
+    .arrControls { display:flex; gap: 8px; align-items:center; margin-top: 8px; flex-wrap: wrap; }
+    .arrControls button { padding: 6px 10px; border-radius: 10px; }
+    .arrItem { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #233448; }
+    .footerRow { display:flex; gap: 10px; align-items:center; justify-content: space-between; flex-wrap: wrap; }
+    .toggleRow { display:flex; gap:10px; align-items:center; margin-top: 8px; flex-wrap: wrap; }
+    .toggleRow input[type="checkbox"]{ width:auto; }
+
+    /* Conversion banner + highlighting */
+    .convertBanner {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #6b5a1a;
+      background: rgba(255, 200, 0, 0.10);
+      color: #ffe08a;
+      font-size: 12px;
+    }
+    .convertedPreview {
+      margin-top: 6px;
+      color: #e6edf3;
+      opacity: 0.95;
+      word-break: break-all;
+    }
+    .convertError {
+      margin-top: 6px;
+      color: #ff8b8b;
+      word-break: break-all;
+    }
+    .addrModeInput {
+      border-color: #6b5a1a !important;
+      box-shadow: 0 0 0 2px rgba(255, 200, 0, 0.08);
+    }
+
+    /* Info icon */
+    .labelRow { display:flex; align-items:center; gap:8px; }
+    .infoWrap { position: relative; display:inline-flex; align-items:center; }
+    .infoIcon {
+      width: 18px; height: 18px; border-radius: 999px;
+      border: 1px solid #2a3d55;
+      background: #0b111a;
+      color: #b9c7d6;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size: 12px; font-weight: 700; line-height: 1;
+      cursor: help;
+      user-select: none;
+    }
+    .tooltip {
+      position: absolute;
+      left: 22px;
+      top: -6px;
+      z-index: 50;
+      width: min(380px, 75vw);
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #2a3d55;
+      background: #0f1621;
+      color: #e6edf3;
+      font-size: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      display: none;
+    }
+    .tooltip .title { font-weight: 700; margin-bottom: 6px; }
+    .tooltip .mono { word-break: break-all; }
+    .infoWrap:hover .tooltip,
+    .infoWrap:focus-within .tooltip { display:block; }
+
+    /* SAFE export */
+    .safeGrid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 700px) { .safeGrid { grid-template-columns: 1fr; } }
+    .inlineWarn { color:#ffe08a; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Calldata Builder</h1>
+    <p class="sub">ABI → function picker → tuple/array-friendly inputs → calldata → copy → (optional) Safe Tx Builder JSON export.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Functions Filter</label>
+            <select id="filter">
+              <option value="write" selected>Write (nonpayable/payable)</option>
+              <option value="read">Read (view/pure)</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div>
+            <label>Notes</label>
+            <div class="muted" style="padding:10px 12px; border:1px solid #1c2a3a; border-radius:10px; background:#0b111a;">
+              Calldata doesn’t require a contract address. Address is only needed for Safe export / sending a tx.
+            </div>
+          </div>
+        </div>
+
+        <label>ABI (JSON)</label>
+        <textarea id="abi" placeholder='[{"type":"function","name":"foo",...}]'></textarea>
+
+        <div class="row" style="margin-top:10px;">
+          <button id="load" class="btn">Load ABI</button>
+          <button id="example" class="btn secondary">Load Tuple Example</button>
+        </div>
+
+        <div id="loadStatus" class="muted" style="margin-top:10px;"></div>
+        <div id="loadError" class="err" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="card">
+        <label>Function</label>
+        <select id="fnSelect" disabled>
+          <option value="">Load ABI to populate…</option>
+        </select>
+
+        <div id="fnMeta" class="muted" style="margin-top:8px;"></div>
+
+        <div id="inputs" class="inputs"></div>
+
+        <label style="margin-top:14px;">Calldata</label>
+        <textarea id="calldata" class="mono" readonly placeholder="0x..."></textarea>
+
+        <div class="footerRow" style="margin-top:10px;">
+          <div>
+            <button id="copy" class="btn" disabled>Copy Calldata</button>
+            <span id="copyMsg" class="pill" style="display:none;"></span>
+          </div>
+          <div class="small" id="hint"></div>
+        </div>
+
+        <details style="margin-top:12px;" id="safeDetails">
+          <summary>
+            <span class="mono">Export Safe Tx Builder JSON</span>
+            <span class="tag">optional</span>
+          </summary>
+
+          <div class="safeGrid" style="margin-top:10px;">
+            <div>
+              <label>Contract address (to)</label>
+              <input id="toAddress" placeholder="0x... (required for export)" class="mono" />
+              <div class="small">Used for the Safe transaction <span class="mono">to</span> field.</div>
+            </div>
+            <div>
+              <label>Chain ID</label>
+              <input id="chainId" placeholder="e.g. 1, 10, 137, 43114" class="mono" />
+              <div class="small">Saved as a string in the JSON (Safe Tx Builder format).</div>
+            </div>
+
+            <div>
+              <label>Meta name</label>
+              <input id="metaName" placeholder="e.g. My Safe tx batch" />
+            </div>
+            <div>
+              <label>Meta description</label>
+              <input id="metaDesc" placeholder="Optional description" />
+            </div>
+
+            <div>
+              <label>Created from Safe address</label>
+              <input id="metaSafe" placeholder="0x... (optional)" class="mono" />
+            </div>
+            <div>
+              <label>Created from Owner address</label>
+              <input id="metaOwner" placeholder="0x... (optional)" class="mono" />
+            </div>
+
+            <div>
+              <label>Tx Builder version</label>
+              <input id="txBuilderVersion" placeholder="e.g. 1.18.0" class="mono" />
+              <div class="small">Purely metadata.</div>
+            </div>
+            <div>
+              <label>Value (wei)</label>
+              <input id="txValue" placeholder="0" class="mono" />
+              <div class="small">Written as a string in the JSON.</div>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <button id="downloadSafe" class="btn" disabled>Download Safe JSON</button>
+            <button id="copySafe" class="btn secondary" disabled>Copy Safe JSON</button>
+          </div>
+
+          <div id="safeWarn" class="inlineWarn" style="margin-top:8px; display:none;"></div>
+
+          <label style="margin-top:12px;">Preview</label>
+          <textarea id="safePreview" class="mono" readonly placeholder="{ ... }" style="min-height:160px;"></textarea>
+        </details>
+
+        <div id="encodeError" class="err" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const state = {
+      iface: null,
+      functions: [],
+      selectedKey: null,
+      rootEditors: [],
+    };
+
+    function safeJsonParse(txt) {
+      try { return { ok: true, value: JSON.parse(txt) }; }
+      catch (e) { return { ok: false, error: e }; }
+    }
+
+    function showLoadStatus(ok, msg) {
+      $("loadError").textContent = "";
+      $("loadStatus").textContent = msg || "";
+      $("loadStatus").className = ok ? "ok" : "muted";
+    }
+    function showLoadError(msg) {
+      $("loadStatus").textContent = "";
+      $("loadError").textContent = msg || "";
+    }
+    function showCopyMsg(text) {
+      const el = $("copyMsg");
+      el.textContent = text;
+      el.style.display = "inline-block";
+      setTimeout(() => { el.style.display = "none"; }, 1100);
+    }
+
+    // ---------- ABI + function loading ----------
+    function getFilteredFunctionFragments(iface, filterMode) {
+      const all = Object.entries(iface.functions).map(([key, frag]) => ({ key, fragment: frag }));
+      return all.filter(({ fragment }) => {
+        if (fragment.type !== "function") return false;
+        const sm = fragment.stateMutability || "";
+        if (filterMode === "write") return (sm === "nonpayable" || sm === "payable");
+        if (filterMode === "read") return (sm === "view" || sm === "pure");
+        return true;
+      });
+    }
+
+    function functionLabel(fragment) {
+      const sm = fragment.stateMutability ? fragment.stateMutability : "";
+      const inputs = fragment.inputs?.map(i => `${i.type}${i.name ? " " + i.name : ""}`).join(", ") || "";
+      const outputs = fragment.outputs?.map(o => o.type).join(", ") || "";
+      const outPart = outputs ? ` → (${outputs})` : "";
+      return `${fragment.name}(${inputs})${outPart} [${sm}]`;
+    }
+
+    function renderFunctionOptions() {
+      const sel = $("fnSelect");
+      sel.innerHTML = "";
+
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = state.functions.length ? "Select a function…" : "No functions found.";
+      sel.appendChild(opt0);
+
+      for (const f of state.functions) {
+        const opt = document.createElement("option");
+        opt.value = f.key;
+        opt.textContent = f.label;
+        sel.appendChild(opt);
+      }
+
+      sel.disabled = state.functions.length === 0;
+      $("copy").disabled = true;
+      $("calldata").value = "";
+      $("inputs").innerHTML = "";
+      $("fnMeta").textContent = "";
+      $("encodeError").textContent = "";
+      $("hint").textContent = "";
+      refreshSafePreview();
+    }
+
+    function loadAbi() {
+      const abiTxt = $("abi").value.trim();
+      const parsed = safeJsonParse(abiTxt);
+      if (!parsed.ok) {
+        showLoadError(`ABI JSON parse error: ${parsed.error.message}`);
+        state.iface = null;
+        state.functions = [];
+        renderFunctionOptions();
+        return;
+      }
+
+      try {
+        const iface = new ethers.utils.Interface(parsed.value);
+        state.iface = iface;
+
+        const filterMode = $("filter").value;
+        const fragments = getFilteredFunctionFragments(iface, filterMode);
+
+        state.functions = fragments.map(({ key, fragment }) => ({
+          key, fragment, label: functionLabel(fragment)
+        })).sort((a,b) => a.label.localeCompare(b.label));
+
+        showLoadStatus(true, `Loaded ABI. Found ${state.functions.length} function(s) for filter: ${filterMode}.`);
+        renderFunctionOptions();
+      } catch (e) {
+        showLoadError(`Could not load ABI into Interface: ${(e && e.message) ? e.message : String(e)}`);
+        state.iface = null;
+        state.functions = [];
+        renderFunctionOptions();
+      }
+    }
+
+    // ---------- Type helpers + examples ----------
+    function isArrayType(type) { return /\[[0-9]*\]$/.test(type); }
+    function arrayBaseType(type) { return type.replace(/\[[0-9]*\]$/, ""); }
+    function arrayDim(type) {
+      const m = type.match(/\[([0-9]*)\]$/);
+      if (!m) return null;
+      return m[1] === "" ? null : Number(m[1]);
+    }
+
+    function bytesN(type) {
+      const m = type.match(/^bytes(\d+)$/);
+      return m ? Number(m[1]) : null;
+    }
+
+    function shouldOfferAddressToBytesMode(param, label) {
+      const name = (param.name || label || "").toLowerCase();
+      const t = param.type;
+      const isBytesish = (t === "bytes" || t.startsWith("bytes"));
+      return isBytesish && name.includes("address");
+    }
+
+    function exampleForParam(param) {
+      const t = param.type;
+
+      if (isArrayType(t)) {
+        const base = arrayBaseType(t);
+        const dim = arrayDim(t);
+        const dimStr = dim == null ? "dynamic" : `fixed ${dim}`;
+        if (base.startsWith("tuple")) return `${dimStr} array of tuples: [ { ... }, { ... } ]`;
+        if (base === "address") return `${dimStr} array: ["0xabc...","0xdef..."]`;
+        if (base.startsWith("uint") || base.startsWith("int")) return `${dimStr} array: ["1","2","3"]`;
+        if (base === "bool") return `${dimStr} array: [true,false,true]`;
+        if (base === "string") return `${dimStr} array: ["a","b"]`;
+        if (base.startsWith("bytes")) return `${dimStr} array: ["0x12","0xabcd..."]`;
+        return `${dimStr} array: [ ... ]`;
+      }
+
+      if (param.type.startsWith("tuple")) {
+        const names = (param.components || []).map(c => c.name || c.type);
+        const shown = names.slice(0, 4).join(", ");
+        return `tuple object: { ${shown}${names.length>4 ? ", ..." : ""} }`;
+      }
+
+      if (t === "address") return "e.g. 0x1234...abcd";
+      if (t === "bool") return "true or false";
+      if (t.startsWith("uint") || t.startsWith("int")) return 'e.g. "123" (decimal string)';
+      if (t === "string") return 'e.g. "hello"';
+      if (t === "bytes" || t.startsWith("bytes")) return "e.g. 0xdeadbeef...";
+      return "value";
+    }
+
+    function parseScalar(type, raw) {
+      const v = (raw ?? "").trim();
+
+      if (type === "address") return ethers.utils.getAddress(v);
+      if (type === "bool") {
+        if (v === "true") return true;
+        if (v === "false") return false;
+        throw new Error(`Invalid bool: "${v}" (use true/false).`);
+      }
+      if (type.startsWith("uint") || type.startsWith("int")) {
+        if (v === "") throw new Error(`Missing value for ${type}.`);
+        if (!/^-?\d+$/.test(v)) throw new Error(`Invalid integer for ${type}: "${v}"`);
+        return ethers.BigNumber.from(v);
+      }
+      if (type === "bytes" || type.startsWith("bytes")) {
+        if (!v.startsWith("0x")) throw new Error(`Expected hex string starting with 0x for ${type}.`);
+        return v;
+      }
+      return v;
+    }
+
+    function addressToBytesLike(type, addressStr) {
+      const addr = ethers.utils.getAddress((addressStr || "").trim());
+      if (type === "bytes") {
+        return ethers.utils.arrayify(addr); // 20 bytes
+      }
+      const n = bytesN(type);
+      if (!n) throw new Error(`Address→bytes mode only supports bytes/bytesN. Got: ${type}`);
+      return ethers.utils.hexZeroPad(addr, n);
+    }
+
+    function addressToBytesRuleText(type) {
+      if (type === "bytes") return "bytes (dynamic): encode the 20-byte address (no padding)";
+      const n = bytesN(type);
+      return `bytes${n}: hexZeroPad(address, ${n}) (left-pad 20 bytes → ${n} bytes)`;
+    }
+
+    // ---------- Editors ----------
+    class ParamEditor {
+      constructor(param, label) { this.param = param; this.label = label; this.el = document.createElement("div"); }
+      getValue() { throw new Error("not implemented"); }
+      mount(parent) { parent.appendChild(this.el); }
+    }
+
+    class ScalarEditor extends ParamEditor {
+      constructor(param, label) {
+        super(param, label);
+
+        this.addrAsBytesEnabled = false;
+        this.offerAddrAsBytes = shouldOfferAddressToBytesMode(param, label);
+
+        this.input = document.createElement("input");
+        this.input.className = "mono";
+        this.input.placeholder = this.offerAddrAsBytes
+          ? `Hex bytes (0x...) or toggle “Enter as address”`
+          : exampleForParam(param);
+
+        this.el.className = "inputBlock";
+
+        // Header with optional info icon
+        const header = document.createElement("div");
+        header.className = "inputHeader";
+
+        const left = document.createElement("div");
+        left.className = "left";
+
+        const labelRow = document.createElement("div");
+        labelRow.className = "labelRow";
+
+        const labelEl = document.createElement("div");
+        labelEl.className = "mono";
+        labelEl.textContent = label;
+        labelRow.appendChild(labelEl);
+
+        if (this.offerAddrAsBytes) {
+          const wrap = document.createElement("span");
+          wrap.className = "infoWrap";
+          wrap.innerHTML = `
+            <span class="infoIcon" tabindex="0" aria-label="Info">i</span>
+            <span class="tooltip">
+              <div class="title">Address-looking name, but bytes type</div>
+              <div class="small">This parameter is <span class="mono">${param.type}</span>, but its name contains “address”.</div>
+              <div class="small" style="margin-top:6px;">You can optionally input an Ethereum address and we will convert it before encoding.</div>
+              <div class="small mono" style="margin-top:6px;">Rule: ${addressToBytesRuleText(param.type)}</div>
+            </span>
+          `;
+          labelRow.appendChild(wrap);
+        }
+
+        const typeEl = document.createElement("div");
+        typeEl.className = "small mono";
+        typeEl.textContent = param.type;
+
+        const hintEl = document.createElement("div");
+        hintEl.className = "hint mono";
+        hintEl.textContent = `Example: ${exampleForParam(param)}`;
+
+        left.appendChild(labelRow);
+        left.appendChild(typeEl);
+        left.appendChild(hintEl);
+
+        const right = document.createElement("div");
+        right.className = "tag";
+        right.textContent = "scalar";
+
+        header.appendChild(left);
+        header.appendChild(right);
+        this.el.appendChild(header);
+
+        // Banner + preview when conversion is enabled
+        this.banner = document.createElement("div");
+        this.banner.className = "convertBanner";
+        this.banner.style.display = "none";
+        this.banner.innerHTML = `
+          <div><b>Address → ${param.type} conversion is ON</b></div>
+          <div class="small mono">We will convert the address you enter and encode the converted value as <span class="mono">${param.type}</span>.</div>
+          <div class="small mono">Rule: ${addressToBytesRuleText(param.type)}</div>
+          <div class="convertedPreview mono" id="preview"></div>
+          <div class="convertError mono" id="previewErr" style="display:none;"></div>
+        `;
+
+        if (this.offerAddrAsBytes) {
+          const toggle = document.createElement("div");
+          toggle.className = "toggleRow mono";
+          toggle.innerHTML = `
+            <label class="small mono" style="margin:0; display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" />
+              Enter as Ethereum address (we will convert to ${param.type})
+            </label>
+          `;
+          const cb = toggle.querySelector('input[type="checkbox"]');
+          cb.addEventListener("change", () => {
+            this.addrAsBytesEnabled = cb.checked;
+            this.banner.style.display = this.addrAsBytesEnabled ? "block" : "none";
+            this.input.classList.toggle("addrModeInput", this.addrAsBytesEnabled);
+            this.input.placeholder = this.addrAsBytesEnabled ? "0xabc... (address)" : "0x... (hex bytes)";
+            this.refreshPreview();
+            encodeCalldata();
+          });
+
+          this.el.appendChild(toggle);
+          this.el.appendChild(this.banner);
+        }
+
+        this.input.addEventListener("input", () => {
+          this.refreshPreview();
+          encodeCalldata();
+        });
+
+        this.el.appendChild(this.input);
+      }
+
+      refreshPreview() {
+        if (!this.offerAddrAsBytes || !this.addrAsBytesEnabled) return;
+        const preview = this.banner.querySelector("#preview");
+        const previewErr = this.banner.querySelector("#previewErr");
+        try {
+          const converted = addressToBytesLike(this.param.type, this.input.value);
+          const hex = (converted instanceof Uint8Array) ? ethers.utils.hexlify(converted) : converted;
+          preview.textContent = `Converted value that will be encoded: ${hex}`;
+          previewErr.style.display = "none";
+          previewErr.textContent = "";
+        } catch (e) {
+          preview.textContent = "";
+          previewErr.style.display = "block";
+          previewErr.textContent = (e && e.message) ? e.message : String(e);
+        }
+      }
+
+      getValue() {
+        if (this.offerAddrAsBytes && this.addrAsBytesEnabled) {
+          return addressToBytesLike(this.param.type, this.input.value);
+        }
+        return parseScalar(this.param.type, this.input.value);
+      }
+    }
+
+    function tupleExampleObjectString(param) {
+      const comps = param.components || [];
+      const parts = comps.slice(0, 4).map((c, i) => {
+        const k = c.name ? c.name : `field${i}`;
+        return `${k}: ${exampleScalarShort(c)}`;
+      });
+      return `{ ${parts.join(", ")}${comps.length > 4 ? ", ..." : ""} }`;
+    }
+    function exampleScalarShort(param) {
+      const t = param.type;
+      if (isArrayType(t)) return "[...]";
+      if (t.startsWith("tuple")) return "{...}";
+      if (t === "address") return '"0xabc..."';
+      if (t === "bool") return "true";
+      if (t.startsWith("uint") || t.startsWith("int")) return '"123"';
+      if (t === "string") return '"hello"';
+      if (t.startsWith("bytes")) return '"0xdead..."';
+      return '"value"';
+    }
+    function arrayExampleString(param) {
+      const base = arrayBaseType(param.type);
+      if (base.startsWith("tuple")) return `[ ${tupleExampleObjectString(param)}, ${tupleExampleObjectString(param)} ]`;
+      if (base === "address") return `["0xabc...","0xdef..."]`;
+      if (base.startsWith("uint") || base.startsWith("int")) return `["1","2","3"]`;
+      if (base === "bool") return `[true,false,true]`;
+      if (base === "string") return `["a","b"]`;
+      if (base.startsWith("bytes")) return `["0x12","0xabcd..."]`;
+      return `[ ... ]`;
+    }
+
+    class TupleEditor extends ParamEditor {
+      constructor(param, label) {
+        super(param, label);
+        this.children = [];
+
+        const d = document.createElement("details");
+        d.open = true;
+
+        const sum = document.createElement("summary");
+        sum.innerHTML = `
+          <span class="mono">${label}</span>
+          <span class="small mono">${param.type}</span>
+          <span class="tag">tuple</span>
+        `;
+        d.appendChild(sum);
+
+        const hint = document.createElement("div");
+        hint.className = "hint mono";
+        hint.textContent = `Example object: ${tupleExampleObjectString(param)}`;
+        d.appendChild(hint);
+
+        const inner = document.createElement("div");
+        inner.className = "kvs";
+        d.appendChild(inner);
+
+        (param.components || []).forEach((c, i) => {
+          const childLabel = c.name ? c.name : `field${i}`;
+          const childEditor = createEditor(c, childLabel);
+          this.children.push(childEditor);
+          childEditor.mount(inner);
+        });
+
+        this.el = d;
+      }
+
+      getValue() {
+        const comps = this.param.components || [];
+        const allNamed = comps.every(c => (c.name && c.name.length > 0));
+        if (allNamed) {
+          const obj = {};
+          comps.forEach((c, i) => obj[c.name] = this.children[i].getValue());
+          return obj;
+        }
+        return this.children.map(ch => ch.getValue());
+      }
+    }
+
+    function cloneParamWithType(param, newType) {
+      const out = Object.assign({}, param);
+      out.type = newType;
+      return out;
+    }
+
+    class ArrayEditor extends ParamEditor {
+      constructor(param, label) {
+        super(param, label);
+
+        this.baseParam = cloneParamWithType(param, arrayBaseType(param.type));
+        this.items = [];
+
+        this.el = document.createElement("details");
+        this.el.open = true;
+
+        const sum = document.createElement("summary");
+        const dim = arrayDim(param.type);
+        const dimLabel = dim == null ? "dynamic" : `fixed ${dim}`;
+        sum.innerHTML = `
+          <span class="mono">${label}</span>
+          <span class="small mono">${param.type}</span>
+          <span class="tag">${dimLabel} array</span>
+        `;
+        this.el.appendChild(sum);
+
+        const hint = document.createElement("div");
+        hint.className = "hint mono";
+        hint.textContent = `Example: ${arrayExampleString(param)}`;
+        this.el.appendChild(hint);
+
+        const controls = document.createElement("div");
+        controls.className = "arrControls";
+        this.btnAdd = document.createElement("button");
+        this.btnAdd.className = "btn secondary";
+        this.btnAdd.type = "button";
+        this.btnAdd.textContent = "+ Add item";
+
+        this.btnRemove = document.createElement("button");
+        this.btnRemove.className = "btn secondary";
+        this.btnRemove.type = "button";
+        this.btnRemove.textContent = "− Remove last";
+
+        this.countLabel = document.createElement("span");
+        this.countLabel.className = "small mono";
+
+        controls.appendChild(this.btnAdd);
+        controls.appendChild(this.btnRemove);
+        controls.appendChild(this.countLabel);
+        this.el.appendChild(controls);
+
+        this.itemsWrap = document.createElement("div");
+        this.el.appendChild(this.itemsWrap);
+
+        this.btnAdd.addEventListener("click", () => {
+          const fixedDim = arrayDim(this.param.type);
+          if (fixedDim != null && this.items.length >= fixedDim) return;
+          this.addItem();
+          encodeCalldata();
+        });
+        this.btnRemove.addEventListener("click", () => {
+          const fixedDim = arrayDim(this.param.type);
+          if (fixedDim != null) return;
+          if (this.items.length === 0) return;
+          this.removeItem();
+          encodeCalldata();
+        });
+
+        const fixed = arrayDim(this.param.type);
+        const initial = fixed != null ? fixed : 0;
+        for (let i = 0; i < initial; i++) this.addItem();
+
+        this.refreshControls();
+      }
+
+      addItem() {
+        const idx = this.items.length;
+        const container = document.createElement("div");
+        container.className = "arrItem";
+
+        const header = document.createElement("div");
+        header.className = "small mono";
+        header.textContent = `Item ${idx}`;
+        container.appendChild(header);
+
+        const editor = createEditor(this.baseParam, `${this.label}[${idx}]`);
+        editor.mount(container);
+
+        this.items.push({ editor, container });
+        this.itemsWrap.appendChild(container);
+        this.refreshControls();
+      }
+
+      removeItem() {
+        const last = this.items.pop();
+        if (last) last.container.remove();
+        this.refreshControls();
+      }
+
+      refreshControls() {
+        const fixed = arrayDim(this.param.type);
+        const isFixed = fixed != null;
+        this.btnRemove.disabled = isFixed || this.items.length === 0;
+        this.btnAdd.disabled = isFixed ? (this.items.length >= fixed) : false;
+        this.countLabel.textContent = `count = ${this.items.length}${isFixed ? ` (fixed)` : ""}`;
+      }
+
+      getValue() {
+        const fixed = arrayDim(this.param.type);
+        if (fixed != null && this.items.length !== fixed) {
+          throw new Error(`Fixed array ${this.param.type} must have exactly ${fixed} items (has ${this.items.length}).`);
+        }
+        return this.items.map(x => x.editor.getValue());
+      }
+    }
+
+    function createEditor(param, label) {
+      if (isArrayType(param.type)) return new ArrayEditor(param, label);
+      if (param.type.startsWith("tuple")) return new TupleEditor(param, label);
+      return new ScalarEditor(param, label);
+    }
+
+    // ---------- selection + rendering ----------
+    function onSelectFunction(key) {
+      state.selectedKey = key || null;
+      $("inputs").innerHTML = "";
+      $("calldata").value = "";
+      $("copy").disabled = true;
+      $("encodeError").textContent = "";
+      $("hint").textContent = "";
+      state.rootEditors = [];
+
+      if (!key) {
+        $("fnMeta").textContent = "";
+        refreshSafePreview();
+        return;
+      }
+
+      const frag = state.iface.getFunction(key);
+      $("fnMeta").textContent = `Signature: ${frag.format(ethers.utils.FormatTypes.full)}`;
+
+      const inputsDiv = $("inputs");
+      if (frag.inputs.length === 0) {
+        const d = document.createElement("div");
+        d.className = "muted";
+        d.textContent = "No inputs.";
+        inputsDiv.appendChild(d);
+      } else {
+        frag.inputs.forEach((inp, i) => {
+          const name = inp.name ? inp.name : `arg${i}`;
+          const editor = createEditor(inp, name);
+          state.rootEditors.push(editor);
+          editor.mount(inputsDiv);
+        });
+      }
+
+      encodeCalldata();
+    }
+
+    // ---------- encoding ----------
+    function encodeCalldata() {
+      $("encodeError").textContent = "";
+      $("copy").disabled = true;
+
+      if (!state.iface || !state.selectedKey) {
+        refreshSafePreview();
+        return;
+      }
+
+      try {
+        const frag = state.iface.getFunction(state.selectedKey);
+        const args = state.rootEditors.map(ed => ed.getValue());
+        const data = state.iface.encodeFunctionData(frag, args);
+
+        $("calldata").value = data;
+        $("copy").disabled = false;
+        $("hint").textContent = "Paste this into your tx builder as the `data` field.";
+      } catch (e) {
+        $("calldata").value = "";
+        $("encodeError").textContent = (e && e.message) ? e.message : String(e);
+        $("hint").textContent = "";
+      } finally {
+        refreshSafePreview();
+      }
+    }
+
+    async function copyCalldata() {
+      const data = $("calldata").value;
+      if (!data) return;
+      try {
+        await navigator.clipboard.writeText(data);
+        showCopyMsg("Copied!");
+      } catch {
+        const ta = $("calldata");
+        ta.focus(); ta.select();
+        document.execCommand("copy");
+        showCopyMsg("Copied!");
+      }
+    }
+
+    // ---------- SAFE export ----------
+    function normalizeAddressOptional(s) {
+      const v = (s || "").trim();
+      if (!v) return "";
+      return ethers.utils.getAddress(v);
+    }
+
+    function buildContractMethod(frag) {
+      const inputs = frag.inputs.map((inp) => {
+        // internalType: use full ParamType formatting to include tuple components
+        const it = inp.format(ethers.utils.FormatTypes.full);
+        const name = inp.name || "";
+        return {
+          name,
+          type: inp.type,
+          internalType: name ? `${it} ${name}` : it
+        };
+      });
+
+      return {
+        inputs,
+        name: frag.name,
+        payable: (frag.stateMutability === "payable")
+      };
+    }
+
+    function buildSafeJson() {
+      const data = ($("calldata").value || "").trim();
+      if (!data || !state.iface || !state.selectedKey) {
+        throw new Error("No calldata yet. Load ABI, select function, and fill inputs.");
+      }
+
+      const toAddr = normalizeAddressOptional($("toAddress").value);
+      if (!toAddr) {
+        throw new Error("Contract address (to) is required for Safe export.");
+      }
+
+      const chainIdRaw = ($("chainId").value || "").trim();
+      if (!chainIdRaw || !/^\d+$/.test(chainIdRaw)) {
+        throw new Error("Chain ID is required for Safe export (digits only).");
+      }
+
+      const frag = state.iface.getFunction(state.selectedKey);
+      const valueStr = (($("txValue").value || "0").trim() || "0");
+      if (!/^\d+$/.test(valueStr)) {
+        throw new Error("Value must be a non-negative integer (wei), e.g. 0.");
+      }
+
+      const metaName = ($("metaName").value || "").trim() || "Safe Transaction";
+      const metaDesc = ($("metaDesc").value || "").trim();
+      const txBuilderVersion = ($("txBuilderVersion").value || "").trim() || "1.18.0";
+
+      const safeAddr = ($("metaSafe").value || "").trim();
+      const ownerAddr = ($("metaOwner").value || "").trim();
+
+      const meta = {
+        name: metaName,
+        description: metaDesc,
+        txBuilderVersion: txBuilderVersion
+      };
+
+      if (safeAddr) meta.createdFromSafeAddress = normalizeAddressOptional(safeAddr);
+      if (ownerAddr) meta.createdFromOwnerAddress = normalizeAddressOptional(ownerAddr);
+
+      return {
+        version: "1.0",
+        chainId: String(chainIdRaw),
+        createdAt: Date.now(),
+        meta,
+        transactions: [
+          {
+            to: toAddr,
+            value: String(valueStr),
+            data: data,
+            contractMethod: buildContractMethod(frag),
+            contractInputsValues: null
+          }
+        ]
+      };
+    }
+
+    function refreshSafePreview() {
+      const warn = $("safeWarn");
+      warn.style.display = "none";
+      warn.textContent = "";
+
+      let preview = "";
+      let enable = false;
+
+      try {
+        // only preview when we have calldata; errors shown inline
+        const hasData = ($("calldata").value || "").trim().length > 0;
+        if (!hasData) {
+          $("safePreview").value = "";
+          $("downloadSafe").disabled = true;
+          $("copySafe").disabled = true;
+          return;
+        }
+
+        const maybeTo = ($("toAddress").value || "").trim();
+        const maybeChain = ($("chainId").value || "").trim();
+
+        // preview even if missing to/chainId, but disable export
+        const fragReady = !!(state.iface && state.selectedKey);
+        if (fragReady) {
+          if (maybeTo && maybeChain) {
+            const obj = buildSafeJson();
+            preview = JSON.stringify(obj, null, 2);
+            enable = true;
+          } else {
+            // best-effort preview stub
+            const frag = state.iface.getFunction(state.selectedKey);
+            const stub = {
+              version: "1.0",
+              chainId: maybeChain || "(required)",
+              createdAt: Date.now(),
+              meta: {
+                name: ($("metaName").value || "Safe Transaction").trim(),
+                description: ($("metaDesc").value || "").trim(),
+                txBuilderVersion: ($("txBuilderVersion").value || "1.18.0").trim()
+              },
+              transactions: [{
+                to: maybeTo || "(required)",
+                value: String((($("txValue").value || "0").trim() || "0")),
+                data: ($("calldata").value || "").trim(),
+                contractMethod: buildContractMethod(frag),
+                contractInputsValues: null
+              }]
+            };
+            preview = JSON.stringify(stub, null, 2);
+            warn.style.display = "block";
+            warn.textContent = "To enable export, fill Contract address (to) and Chain ID.";
+          }
+        }
+
+      } catch (e) {
+        warn.style.display = "block";
+        warn.textContent = (e && e.message) ? e.message : String(e);
+        preview = "";
+        enable = false;
+      }
+
+      $("safePreview").value = preview;
+      $("downloadSafe").disabled = !enable;
+      $("copySafe").disabled = !enable;
+    }
+
+    function downloadSafeJson() {
+      const obj = buildSafeJson();
+      const text = JSON.stringify(obj, null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      const name = (obj.meta?.name || "safe-transaction").toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name || "safe-transaction"}.txbuilder.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function copySafeJson() {
+      const obj = buildSafeJson();
+      const text = JSON.stringify(obj, null, 2);
+      try {
+        await navigator.clipboard.writeText(text);
+        showCopyMsg("Safe JSON copied!");
+      } catch {
+        $("safePreview").focus();
+        $("safePreview").select();
+        document.execCommand("copy");
+        showCopyMsg("Safe JSON copied!");
+      }
+    }
+
+    // ---------- example ----------
+    function loadTupleExample() {
+      $("filter").value = "write";
+
+      // Demonstrates address→bytes toggle: name contains "Address", type is bytes32.
+      const abi = [
+        {
+          "type":"function",
+          "name":"doThing",
+          "stateMutability":"nonpayable",
+          "inputs":[
+            { "name":"remotePoolAddress", "type":"bytes32" },
+            {
+              "name":"order",
+              "type":"tuple",
+              "components":[
+                {"name":"maker","type":"address"},
+                {"name":"amount","type":"uint256"},
+                {"name":"notes","type":"string"},
+                {"name":"flags","type":"bool"},
+                {"name":"path","type":"address[]"},
+                {
+                  "name":"meta",
+                  "type":"tuple",
+                  "components":[
+                    {"name":"nonce","type":"uint256"},
+                    {"name":"salt","type":"bytes32"}
+                  ]
+                }
+              ]
+            },
+            {
+              "name":"fills",
+              "type":"tuple[]",
+              "components":[
+                {"name":"taker","type":"address"},
+                {"name":"fillAmount","type":"uint256"}
+              ]
+            },
+            { "name":"ids", "type":"uint256[]" }
+          ],
+          "outputs":[]
+        }
+      ];
+
+      $("abi").value = JSON.stringify(abi, null, 2);
+      loadAbi();
+
+      // Helpful defaults for Safe export demo
+      $("chainId").value = "43114";
+      $("txBuilderVersion").value = "1.18.0";
+      $("metaName").value = "Example Safe Tx";
+      $("metaDesc").value = "Generated from calldata builder";
+      refreshSafePreview();
+    }
+
+    // ---------- wiring ----------
+    $("load").addEventListener("click", loadAbi);
+    $("example").addEventListener("click", loadTupleExample);
+    $("filter").addEventListener("change", () => { if (state.iface) loadAbi(); });
+    $("fnSelect").addEventListener("change", (e) => onSelectFunction(e.target.value));
+    $("copy").addEventListener("click", copyCalldata);
+
+    // Safe export wiring
+    ["toAddress","chainId","metaName","metaDesc","metaSafe","metaOwner","txBuilderVersion","txValue"].forEach(id => {
+      $(id).addEventListener("input", refreshSafePreview);
+    });
+    $("downloadSafe").addEventListener("click", downloadSafeJson);
+    $("copySafe").addEventListener("click", copySafeJson);
+
+    showLoadStatus(false, "Paste ABI and click “Load ABI”, or use the Tuple Example.");
+  </script>
+</body>
+</html>
